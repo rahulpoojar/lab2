@@ -221,7 +221,128 @@ public class TestOperatorClient {
 run the file, you get the output as
 
 Add: 15
-Sub: 5
+Sub: 5Nice, this is a fun one 😎
+
+If sir wants “something special” **other than NFS / SMB / WebDAV**, the cleanest and most impressive thing you can show on TrueNAS CORE is:
+
+---
+
+## 💡 Idea: Expose Storage as an **iSCSI Block Device** to a Client VM
+
+Instead of sharing *files*, you share a **virtual disk** over the network.
+Your Ubuntu/Windows client will see it like a new hard drive.
+
+You can explain:
+
+> “NFS/SMB/WebDAV are *file-level* protocols.
+> iSCSI is *block-level* storage, commonly used for virtualization and databases.”
+
+That sounds fancy in a viva 🤌
+
+---
+
+## Steps (high level, for your notes)
+
+### 1️⃣ Create a ZVOL (block device) on TrueNAS
+
+1. In TrueNAS UI → **Storage → Pools**
+2. Click the **3 dots** on your pool → **Add Zvol**
+3. Give name: `iscsi_disk`
+4. Size: e.g. `10 GiB`
+5. Save.
+
+This ZVOL will be exported via iSCSI.
+
+---
+
+### 2️⃣ Enable & configure iSCSI service
+
+1. **Sharing → Block Shares (iSCSI)**
+2. **Wizard** (or go tab by tab):
+
+**Portal:**
+
+* Add portal → 0.0.0.0 (all IPs) or specific TrueNAS IP
+* Default port 3260
+
+**Initiator / Authorized network:**
+
+* Add your client VM subnet, e.g. `192.168.1.0/24`
+
+**Extent:**
+
+* Type: **Device**
+* Device: pick `zvol/<yourpool>/iscsi_disk`
+
+**Target / Associated target:**
+
+* Create new target and attach the extent.
+
+3. Go to **Services → iSCSI → Start**, then toggle to **Start Automatically**.
+
+---
+
+### 3️⃣ Connect from client VM (Ubuntu example)
+
+On the Ubuntu client:
+
+```bash
+sudo apt update
+sudo apt install open-iscsi
+```
+
+Edit `/etc/iscsi/iscsid.conf` only if needed (usually default fine).
+
+Discover the target:
+
+```bash
+sudo iscsiadm -m discovery -t sendtargets -p <TRUENAS_IP>
+```
+
+Log in:
+
+```bash
+sudo iscsiadm -m node --login
+```
+
+Now check new disk:
+
+```bash
+lsblk
+```
+
+You’ll see something like `/dev/sdb` (10G).
+
+Create filesystem & mount:
+
+```bash
+sudo mkfs.ext4 /dev/sdb
+sudo mkdir /mnt/iscsi
+sudo mount /dev/sdb /mnt/iscsi
+```
+
+Now you can create files there – they’re actually stored on TrueNAS as a block device.
+
+---
+
+## 🎓 What you can say in lab / viva
+
+* “We already demonstrated **file-level** sharing (NFS/SMB/WebDAV).
+  Here I implemented **iSCSI**, which exposes a **block device** over the network.”
+* “Client OS treats it like a real hard disk – we can create partitions, filesystems, even use it for VMs.”
+* “Underneath it’s a ZFS ZVOL, so we can also take **snapshots** and **roll back** this virtual disk from TrueNAS UI.”
+
+---
+
+If you want a second “bonus” feature, you can also show:
+
+* **Automatic ZFS snapshots** of this iSCSI ZVOL and a quick rollback demo.
+
+If you tell me your pool name + client OS (Ubuntu/Windows), I can write the exact commands you can keep in your notes and just copy in lab.
 Mul: 50
 Div: 2
+
+
+
+
 
